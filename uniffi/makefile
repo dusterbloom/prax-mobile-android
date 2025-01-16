@@ -1,11 +1,21 @@
-.PHONY: all build copy clean
+.PHONY: all build-ios build-android copy clean validate-env test-build
 
 # Default target
-all: build copy
+all: validate-env build-ios build-android copy
 
-# Build target - handles compilation and XCFramework creation
-build:
-	@echo "Building library and generating bindings..."
+# Environment validation
+validate-env:
+	@echo "Validating build environment..."
+	@command -v rustc >/dev/null 2>&1 || { echo "Error: Rust not installed"; exit 1; }
+	@command -v cargo >/dev/null 2>&1 || { echo "Error: Cargo not installed"; exit 1; }
+	@command -v xcodebuild >/dev/null 2>&1 || { echo "Error: Xcode not installed"; exit 1; }
+	@test -d "$$ANDROID_HOME" || { echo "Error: ANDROID_HOME not set"; exit 1; }
+	@test -d "$$ANDROID_HOME/ndk/26.3.11579264" || { echo "Error: Required NDK not found"; exit 1; }
+	@cargo install uniffi-bindgen
+
+# iOS Build
+build-ios:
+	@echo "Building for iOS..."
 	cargo build
 	cargo run --bin uniffi-bindgen generate --library ./target/debug/libmobile.dylib --language swift --out-dir ./bindings
 	@echo "Building for iOS targets..."
@@ -21,21 +31,47 @@ build:
 		-library ./target/aarch64-apple-ios/release/libmobile.a -headers ./bindings \
 		-output "ios/Mobile.xcframework"
 
-# Copy target - handles moving files to the correct locations
+# Android Build
+build-android:
+	@echo "Building for Android..."
+	for target in aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android; do \
+		rustup target add $$target; \
+		cargo build --release --target=$$target; \
+	done
+	cargo run --bin uniffi-bindgen generate --library ./target/debug/libmobile.dylib --language kotlin --out-dir ./android/src/main/kotlin
+
+# Copy artifacts
 copy:
-	@echo "Copying framework to react-native-expo..."
+	@echo "Creating directories if they don't exist..."
+	mkdir -p ../react-native-expo/modules/penumbra-sdk-module/ios
+	mkdir -p ../react-native-expo/modules/penumbra-sdk-module/android/src/main/jniLibs/arm64-v8a
+	mkdir -p ../react-native-expo/modules/penumbra-sdk-module/android/src/main/jniLibs/armeabi-v7a
+	mkdir -p ../react-native-expo/modules/penumbra-sdk-module/android/src/main/jniLibs/x86_64
+	mkdir -p ../react-native-expo/modules/penumbra-sdk-module/android/src/main/jniLibs/x86
+	
+	@echo "Copying iOS framework..."
 	rm -rf ../react-native-expo/modules/penumbra-sdk-module/ios/Mobile.xcframework
 	cp -r ./ios/Mobile.xcframework ../react-native-expo/modules/penumbra-sdk-module/ios
-	@echo "Cleaning up and copying Swift files..."
-	rm -f ../react-native-expo/modules/penumbra-sdk-module/ios/Mobile.xcframework/ios-arm64/Headers/mobile.swift
-	rm -f ../react-native-expo/modules/penumbra-sdk-module/ios/Mobile.xcframework/ios-arm64-simulator/Headers/mobile.swift
-	rm -f ../react-native-expo/modules/penumbra-sdk-module/ios/mobile.swift
-	cp ./bindings/mobile.swift ../react-native-expo/modules/penumbra-sdk-module/ios
+	
+	@echo "Copying Android libraries..."
+	cp ./target/aarch64-linux-android/release/libmobile.so ../react-native-expo/modules/penumbra-sdk-module/android/src/main/jniLibs/arm64-v8a/
+	cp ./target/armv7-linux-androideabi/release/libmobile.so ../react-native-expo/modules/penumbra-sdk-module/android/src/main/jniLibs/armeabi-v7a/
+	cp ./target/x86_64-linux-android/release/libmobile.so ../react-native-expo/modules/penumbra-sdk-module/android/src/main/jniLibs/x86_64/
+	cp ./target/i686-linux-android/release/libmobile.so ../react-native-expo/modules/penumbra-sdk-module/android/src/main/jniLibs/x86/
 
-# Clean target
+# Test build
+test-build:
+	@echo "Testing iOS build..."
+	eas build --profile development --platform ios
+	@echo "Testing Android build..."
+	eas build --profile development --platform android
+
+# Clean
 clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf ./target
 	rm -rf ./bindings
 	rm -rf ./ios/Mobile.xcframework
+	rm -rf ./android/src/main/jniLibs
 	rm -rf ../react-native-expo/modules/penumbra-sdk-module/ios/Mobile.xcframework
+	rm -rf ../react-native-expo/modules/penumbra-sdk-module/android/src/main/jniLibs

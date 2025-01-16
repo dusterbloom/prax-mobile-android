@@ -1,0 +1,81 @@
+package expo.modules.mymodule
+
+import expo.modules.kotlin.modules.Module
+import expo.modules.kotlin.modules.ModuleDefinition
+import java.net.URL
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import uniffi.mobile.*
+
+class MyModule : Module() {
+    private val scope = CoroutineScope(Dispatchers.Default)
+
+    override fun definition() = ModuleDefinition {
+        // Keep your existing module name
+        Name("MyModule")
+
+        // Keep your existing constants
+        Constants(
+            "PI" to Math.PI
+        )
+
+        // Keep your existing events
+        Events("onChange")
+
+        // Keep your existing hello function
+        Function("hello") {
+            "Hello world! 👋"
+        }
+
+        // Keep your existing setValueAsync function
+        AsyncFunction("setValueAsync") { value: String ->
+            sendEvent("onChange", mapOf(
+                "value" to value
+            ))
+        }
+
+        // Add new Penumbra SDK functions
+        AsyncFunction("createAppStateContainer") { promise ->
+            scope.launch {
+                try {
+                    val result = createAppStateContainer()
+                    promise.resolve(result)
+                } catch (e: AppException) {
+                    promise.reject("APP_ERROR", e.message, e)
+                }
+            }
+        }
+
+        AsyncFunction("startServer") { promise ->
+            scope.launch {
+                try {
+                    val result = startServer()
+                    promise.resolve(result)
+                } catch (e: AppException) {
+                    promise.reject("SERVER_ERROR", e.message, e)
+                }
+            }
+        }
+
+        AsyncFunction("getBlockHeight") { promise ->
+            scope.launch {
+                try {
+                    val result = getBlockHeight()
+                    // Convert ULong to String since JavaScript doesn't support 64-bit integers
+                    promise.resolve(result.toString())
+                } catch (e: AppException) {
+                    promise.reject("BLOCK_HEIGHT_ERROR", e.message, e)
+                }
+            }
+        }
+
+        // Keep your existing view definition
+        View(MyModuleView::class) {
+            Prop("url") { view: MyModuleView, url: URL ->
+                view.webView.loadUrl(url.toString())
+            }
+            Events("onLoad")
+        }
+    }
+}
