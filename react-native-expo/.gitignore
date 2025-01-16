@@ -40,3 +40,7 @@ app-example
 modules/penumbra-sdk-module/ios/Mobile.xcframework/**/*.a
 
 *storybook.log
+
+
+/android/
+modules/penumbra-sdk-module/android/
