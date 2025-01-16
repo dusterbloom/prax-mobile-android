@@ -1,5 +1,33 @@
 # penumbra-mobile
 
+# ANDROID
+
+## Uniffi
+
+Build, generate and copy the kotlin bindings
+
+   ```bash
+   cd uniffi && ./build-android.sh
+   ```
+
+## React Native Application
+
+This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+
+1. Install dependencies
+
+   ```bash
+   cd react-native-expo && npm install
+   ```
+
+2. Start the app
+
+   ```bash
+   npm run android
+   ```
+
+
+# iOS
 ## Uniffi
 
 1. Generate swift bindings
